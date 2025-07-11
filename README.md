@@ -60,11 +60,47 @@ Now, edit the `.env` file and fill in the following values:
 
 ### 4. Prepare Your Feishu Bitable
 
-Your Bitable table should have at least the following columns:
+For this application to work correctly, you must set up a Feishu Bitable table with specific columns. The application will read from and write to these columns.
 
-- `Identifier` (Single-line text): Stores a unique hash to prevent duplicates.
-- `Status` (Single-select): With options `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`.
-- ... and other columns for your task data (e.g., `Payload`, `CreatedAt`, etc.).
+#### Mandatory Columns
+
+These two columns are **required** for the core logic of the task manager.
+
+| Column Name  | Column Type      | Description                                                                                                                              |
+| :----------- | :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| `Identifier` | `Single-line text` | **Crucial for preventing duplicates.** This field stores a unique MD5 hash of the task content. The application manages this automatically. |
+| `Status`     | `Single-select`  | **Tracks the task lifecycle.** You **must** create this column with the following four options (case-sensitive): `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`. |
+
+#### Custom Data Columns
+
+You need to add columns that correspond to the keys in the JSON data you plan to send to the application. The application will automatically map the JSON keys to the column names.
+
+**Example:**
+
+If you plan to send tasks with the following JSON structure:
+
+```json
+{
+  "url": "https://example.com/data/1",
+  "customer_id": "CUST-007",
+  "retry_count": 3
+}
+```
+
+Then, in addition to the mandatory columns, you would need to create the following columns in your Bitable:
+
+| Column Name     | Column Type | Description                               |
+| :-------------- | :---------- | :---------------------------------------- |
+| `url`           | `URL` or `Text` | To store the URL from the task.           |
+| `customer_id`   | `Text`      | To store the customer's unique ID.        |
+| `retry_count`   | `Number`    | To store the number of retries.           |
+
+Your final table structure would look something like this:
+
+| Identifier (Text) | Status (Select) | url (URL) | customer_id (Text) | retry_count (Number) |
+| :---------------- | :-------------- | :-------- | :----------------- | :------------------- |
+| (auto-generated)  | PENDING         | ...       | ...                | ...                  |
+
 
 ## How to Run
 

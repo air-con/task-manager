@@ -1,4 +1,5 @@
 import hashlib
+import json
 from fastapi import APIRouter, HTTPException, Body
 from typing import List, Dict, Any
 
@@ -17,8 +18,9 @@ async def ingest_data(data: List[Dict[str, Any]] = Body(...)):
     """
     new_records = []
     for item in data:
-        # Create a unique identifier for the task to check for duplicates
-        identifier = hashlib.sha256(str(item).encode()).hexdigest()
+        # Create a unique, order-independent identifier for the task
+        canonical_json = json.dumps(item, sort_keys=True)
+        identifier = hashlib.md5(canonical_json.encode()).hexdigest()
         
         is_duplicate = await services.check_duplicate(identifier)
         if not is_duplicate:
@@ -50,7 +52,8 @@ async def priority_queue_task(tasks: List[Dict[str, Any]] = Body(...)):
         # Then, add to Bitable with PROCESSING status
         records_to_add = []
         for task in tasks:
-            identifier = hashlib.sha256(str(task).encode()).hexdigest()
+            canonical_json = json.dumps(task, sort_keys=True)
+            identifier = hashlib.md5(canonical_json.encode()).hexdigest()
             records_to_add.append({
                 **task,
                 "Identifier": identifier,
