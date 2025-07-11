@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+apscheduler
+lark-oapi
+python-dotenv
+celery
+amqp
