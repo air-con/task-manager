@@ -22,6 +22,10 @@ class Settings:
     CELERY_TASK_NAME: str = os.getenv("CELERY_TASK_NAME")
     CELERY_QUEUE: str = os.getenv("CELERY_QUEUE")
 
+    # Scheduler Settings
+    SCHEDULER_TASK_REPLENISH_COUNT: int = int(os.getenv("SCHEDULER_TASK_REPLENISH_COUNT", 5000))
+    SCHEDULER_BATCH_SIZE: int = int(os.getenv("SCHEDULER_BATCH_SIZE", 10))
+
     import hashlib
 
 class Settings:

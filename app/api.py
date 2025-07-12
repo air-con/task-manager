@@ -1,6 +1,6 @@
 from loguru import logger
 from fastapi import APIRouter, HTTPException, Body, Depends, Header
-from typing import List, Dict, Any, TypedDict
+from typing import List, Dict, Any, TypedDict, Union
 
 # --- Type Definitions ---
 
@@ -85,18 +85,21 @@ async def ingest_data(data: List[Dict[str, Any]] = Body(...)):
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/tasks/priority-queue")
-async def priority_queue_task(tasks: List[Dict[str, Any]] = Body(...), priority: int = 5):
+async def priority_queue_task(tasks: Union[Dict[str, Any], List[Dict[str, Any]]] = Body(...), priority: int = 5):
     """
     Receives a task or list of tasks, publishes it directly to the MQ with high priority,
     and saves it to the Bitable with PROCESSING status.
     """
     try:
+        # Standardize input to always be a list for consistent processing
+        tasks_list = tasks if isinstance(tasks, list) else [tasks]
+
         # Publish to Celery first with the specified priority
-        services.publish_to_celery(tasks, priority=priority)
+        services.publish_to_celery(tasks_list, priority=priority)
         
         # Then, add to Bitable with PROCESSING status
         records_to_add = []
-        for task in tasks:
+        for task in tasks_list:
             payload_json = json.dumps(task, sort_keys=True, ensure_ascii=False)
             identifier = hashlib.md5(payload_json.encode()).hexdigest()
             records_to_add.append({

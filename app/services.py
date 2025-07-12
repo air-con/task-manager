@@ -114,19 +114,28 @@ async def get_pending_tasks_from_bitable(count: int) -> List[Dict[str, Any]]:
 
 # --- Celery Publisher & Notification Operations ---
 
-def publish_to_celery(tasks: Any, priority: int = None):
+def publish_to_celery(tasks: Union[Dict[str, Any], List[Dict[str, Any]]], priority: int = None):
     """
-    Publishes tasks directly to Celery.
+    Publishes tasks to Celery, optimizing for a single task.
     """
+    task_to_send = tasks
+    task_count = 1
+
+    if isinstance(tasks, list):
+        if len(tasks) == 1:
+            # If it's a list with a single item, just send the item itself.
+            task_to_send = tasks[0]
+        task_count = len(tasks)
+
     celery_app.send_task(
         name=settings.CELERY_TASK_NAME,
-        args=[tasks],
+        args=[task_to_send],
         queue=settings.CELERY_QUEUE,
         priority=priority
     )
-    task_count = len(tasks) if isinstance(tasks, list) else 1
+    
     priority_str = f" with priority {priority}" if priority is not None else ""
-    logger.info(f"Sent {task_count} tasks to Celery queue '{settings.CELERY_QUEUE}'{priority_str}.")
+    logger.info(f"Sent {task_count} task(s) to Celery queue '{settings.CELERY_QUEUE}'{priority_str}.")
 
 from . import state
 

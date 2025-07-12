@@ -3,25 +3,23 @@ from loguru import logger
 from . import services
 from .config import settings
 
-TASK_POOL_THRESHOLD = 3000
-TASK_REPLENISH_COUNT = 5000 # Replenish up to 5000, but the logic will fetch 500 at a time.
+# If the number of pending tasks drops below 60% of the replenish count, trigger replenishment.
+TASK_POOL_THRESHOLD_RATIO = 0.6
 
 async def check_and_replenish_tasks():
     """
     Checks the number of tasks in the MQ (simulated) and replenishes them from the database if below a threshold.
     """
-    # In a real scenario, you would query the MQ to get the current queue size.
-    # Here, we'll simulate this by checking the number of PENDING tasks in Bitable
-    # as a proxy for the available task pool.
-    
     try:
-        pending_tasks = await services.get_pending_tasks_from_bitable(TASK_POOL_THRESHOLD + 1)
+        task_pool_threshold = int(settings.SCHEDULER_TASK_REPLENISH_COUNT * TASK_POOL_THRESHOLD_RATIO)
+
+        pending_tasks = await services.get_pending_tasks_from_bitable(task_pool_threshold + 1)
         current_task_count = len(pending_tasks)
         
-        logger.info(f"Current pending tasks: {current_task_count}. Threshold: {TASK_POOL_THRESHOLD}")
+        logger.info(f"Current pending tasks: {current_task_count}. Threshold: {task_pool_threshold}")
 
-        if current_task_count < TASK_POOL_THRESHOLD:
-            tasks_to_fetch = TASK_REPLENISH_COUNT - current_task_count
+        if current_task_count < task_pool_threshold:
+            tasks_to_fetch = settings.SCHEDULER_TASK_REPLENISH_COUNT - current_task_count
             # Fetch in batches of 500 as per requirement
             tasks_to_fetch = min(tasks_to_fetch, 500)
             
@@ -36,12 +34,17 @@ async def check_and_replenish_tasks():
                 logger.info("No pending tasks available to replenish.")
                 return
 
-            # Chunk tasks into groups of 10 before publishing
-            chunked_tasks = [new_tasks[i:i + 10] for i in range(0, len(new_tasks), 10)]
-            for chunk in chunked_tasks:
-                services.publish_to_celery(
-                    [task['fields'] for task in chunk]
-                )
+            # Publish tasks based on the configured batch size
+            batch_size = settings.SCHEDULER_BATCH_SIZE
+            if batch_size > 1:
+                logger.info(f"Publishing tasks in multi-mode with batch size {batch_size}.")
+                chunked_tasks = [new_tasks[i:i + batch_size] for i in range(0, len(new_tasks), batch_size)]
+                for chunk in chunked_tasks:
+                    services.publish_to_celery([task['fields'] for task in chunk])
+            else: # single mode
+                logger.info("Publishing tasks in single-mode.")
+                for task in new_tasks:
+                    services.publish_to_celery(task['fields'])
             
             # Update their status to PROCESSING
             updates = [
