@@ -21,7 +21,6 @@ class Settings:
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL")
     CELERY_TASK_NAME: str = os.getenv("CELERY_TASK_NAME")
     CELERY_QUEUE: str = os.getenv("CELERY_QUEUE")
-    CELERY_DEFAULT_PRIORITY: int = int(os.getenv("CELERY_DEFAULT_PRIORITY", 5))
-    CELERY_HIGH_PRIORITY: int = int(os.getenv("CELERY_HIGH_PRIORITY", 1))
+    
 
 settings = Settings()

@@ -1,9 +1,16 @@
 import hashlib
 import json
 from fastapi import APIRouter, HTTPException, Body
-from typing import List, Dict, Any
+from typing import List, Dict, Any, TypedDict
 
-from . import services
+# --- Type Definitions ---
+
+class StatusUpdate(TypedDict):
+    record_id: str
+    status: str
+
+from . import services, state
+from .services import StatusEnum
 from .config import settings
 
 router = APIRouter()
@@ -16,48 +23,69 @@ async def ingest_data(data: List[Dict[str, Any]] = Body(...)):
     Receives data, checks for duplicates, and saves it to the Bitable with PENDING status.
     The duplication check is based on a hash of the item's content.
     """
-    new_records = []
+    records_to_add = []
     for item in data:
-        # Create a unique, order-independent identifier for the task
-        canonical_json = json.dumps(item, sort_keys=True)
-        identifier = hashlib.md5(canonical_json.encode()).hexdigest()
-        
-        is_duplicate = await services.check_duplicate(identifier)
-        if not is_duplicate:
-            new_records.append({
-                **item,
-                "Identifier": identifier,
-                "Status": "PENDING"
-            })
+        # Create a canonical JSON string for both hashing and storing.
+        # sort_keys ensures consistent hashing.
+        # ensure_ascii=False preserves non-ASCII characters.
+        payload_json = json.dumps(item, sort_keys=True, ensure_ascii=False)
+        identifier = hashlib.md5(payload_json.encode()).hexdigest()
+        records_to_add.append({
+            "id": identifier,
+            "status": StatusEnum.PENDING,
+            "payload": payload_json
+        })
 
-    if not new_records:
-        return {"message": "Data already exists or empty input.", "tasks_added": 0}
+    if not records_to_add:
+        return {"message": "Empty input.", "tasks_added": 0}
 
     try:
-        added_tasks = await services.add_records_to_bitable(new_records)
-        return {"message": "Data ingested successfully.", "tasks_added": len(added_tasks)}
+        # Optimistic batch insert
+        added_tasks = await services.add_records_to_bitable(records_to_add)
+        return {
+            "message": "Data ingested successfully.",
+            "tasks_added": len(added_tasks),
+            "tasks_duplicated": len(records_to_add) - len(added_tasks)
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # If batch fails due to duplicates, fallback to individual inserts
+        if "duplicate" in str(e).lower():
+            print("Batch insert failed due to duplicates, falling back to individual inserts.")
+            successful_inserts = 0
+            duplicate_inserts = 0
+            for record in records_to_add:
+                if await services.add_single_record(record):
+                    successful_inserts += 1
+                else:
+                    duplicate_inserts += 1
+            return {
+                "message": "Data ingested with some duplicates.",
+                "tasks_added": successful_inserts,
+                "tasks_duplicated": duplicate_inserts
+            }
+        else:
+            # For other errors, re-raise
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/tasks/priority-queue")
-async def priority_queue_task(tasks: List[Dict[str, Any]] = Body(...)):
+async def priority_queue_task(tasks: List[Dict[str, Any]] = Body(...), priority: int = 5):
     """
     Receives a task or list of tasks, publishes it directly to the MQ with high priority,
     and saves it to the Bitable with PROCESSING status.
     """
     try:
-        # Publish to Celery first with high priority
-        services.publish_to_celery(tasks, priority=settings.CELERY_HIGH_PRIORITY)
+        # Publish to Celery first with the specified priority
+        services.publish_to_celery(tasks, priority=priority)
         
         # Then, add to Bitable with PROCESSING status
         records_to_add = []
         for task in tasks:
-            canonical_json = json.dumps(task, sort_keys=True)
-            identifier = hashlib.md5(canonical_json.encode()).hexdigest()
+            payload_json = json.dumps(task, sort_keys=True, ensure_ascii=False)
+            identifier = hashlib.md5(payload_json.encode()).hexdigest()
             records_to_add.append({
-                **task,
-                "Identifier": identifier,
-                "Status": "PROCESSING"
+                "id": identifier,
+                "status": StatusEnum.PROCESSING,
+                "payload": payload_json
             })
             
         await services.add_records_to_bitable(records_to_add)
@@ -67,27 +95,48 @@ async def priority_queue_task(tasks: List[Dict[str, Any]] = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/tasks/update-status")
-async def update_task_status(updates: Dict[str, List[str]] = Body(...)):
+async def update_task_status(updates: List[StatusUpdate] = Body(...)):
     """
     Updates the status of multiple tasks based on their record_ids.
-    The body should be like: {"SUCCESS": ["rec_id1", "rec_id2"], "FAILED": ["rec_id3"]}
+    The body should be a list of objects, e.g.: 
+    [{"record_id": "rec_id1", "status": "SUCCESS"},
+     {"record_id": "rec_id2", "status": "FAILED"}]
     """
-    bitable_updates = []
-    for status, record_ids in updates.items():
-        if status not in ["SUCCESS", "FAILED", "PENDING"]:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-        
-        for record_id in record_ids:
-            bitable_updates.append({
-                "record_id": record_id,
-                "fields": {"Status": status}
-            })
-            
-    if not bitable_updates:
+    if not updates:
         raise HTTPException(status_code=400, detail="No updates provided.")
+
+    bitable_updates = []
+    for update in updates:
+        record_id = update.get("record_id")
+        status = update.get("status")
+        if not record_id or not status:
+            raise HTTPException(status_code=400, detail="Each update must have a record_id and a status.")
+        
+        if status not in [s.value for s in StatusEnum]:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}. Must be one of {list(StatusEnum)}")
+
+        bitable_updates.append({
+            "record_id": record_id,
+            "fields": {"status": status}
+        })
 
     try:
         await services.update_records_in_bitable(bitable_updates)
         return {"message": "Task statuses updated successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/notifications/status")
+async def get_notification_status():
+    """
+    Returns the current status of the notification switch.
+    """
+    return {"notifications_enabled": state.NOTIFICATIONS_ENABLED}
+
+@router.post("/notifications/toggle")
+async def toggle_notifications(enabled: bool = Body(..., embed=True)):
+    """
+    Enables or disables notifications.
+    """
+    state.NOTIFICATIONS_ENABLED = enabled
+    return {"message": f"Notifications have been {'enabled' if enabled else 'disabled'}.", "notifications_enabled": state.NOTIFICATIONS_ENABLED}

@@ -34,11 +34,12 @@ async def check_and_replenish_tasks():
                 print("No pending tasks available to replenish.")
                 return
 
-            # Publish to Celery with default priority
-            services.publish_to_celery(
-                [task['fields'] for task in new_tasks],
-                priority=settings.CELERY_DEFAULT_PRIORITY
-            )
+            # Chunk tasks into groups of 10 before publishing
+            chunked_tasks = [new_tasks[i:i + 10] for i in range(0, len(new_tasks), 10)]
+            for chunk in chunked_tasks:
+                services.publish_to_celery(
+                    [task['fields'] for task in chunk]
+                )
             
             # Update their status to PROCESSING
             updates = [
