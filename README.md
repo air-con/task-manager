@@ -115,19 +115,82 @@ uvicorn app.main:app --reload
 
 The API will be available at `http://127.0.0.1:8000`.
 
-### Docker Deployment
+### Docker Deployment (Step-by-Step)
 
-To build and run the application using Docker:
+Deploying the application with Docker provides a consistent and isolated environment. Here’s how to do it:
+
+**Step 1: Prepare Your Environment**
+
+Make sure you have Docker installed and running on your system.
+
+**Step 2: Configure Environment Variables**
+
+The Docker container needs access to all the necessary environment variables to run correctly. The most secure way to provide them is through an environment file.
+
+- Ensure you have a `.env` file in the root of the project, as described in the "Configure Environment Variables" section.
+- **Crucially**, make sure this file is complete and all values are correctly set for your production environment.
+
+**Step 3: Build the Docker Image**
+
+Navigate to the root directory of the project in your terminal and run the `docker build` command. This command reads the `Dockerfile`, installs all dependencies, and packages the application into a reusable image.
 
 ```bash
-# Build the Docker image
-docker build -t task-manager .
-
-# Run the container
-docker run -d -p 8080:80 --env-file .env --name task-manager-app task-manager
+# The -t flag tags the image with a name (e.g., task-manager-app)
+docker build -t task-manager-app .
 ```
 
-The API will be available at `http://localhost:8080`.
+**Step 4: Run the Docker Container**
+
+Once the image is built, you can create and run a container from it. 
+
+```bash
+docker run \
+  -d \
+  -p 8080:80 \
+  --env-file ./.env \
+  --name my-task-manager \
+  --restart unless-stopped \
+  task-manager-app
+```
+
+Let's break down this command:
+- `-d`: Runs the container in detached mode (in the background).
+- `-p 8080:80`: Maps port 8080 on your host machine to port 80 inside the container. You will access the API via `http://localhost:8080`.
+- `--env-file ./.env`: This is the most important part. It securely passes all the variables from your `.env` file into the container.
+- `--name my-task-manager`: Assigns a memorable name to your container for easier management.
+- `--restart unless-stopped`: A crucial policy for production. It ensures the container automatically restarts if it crashes, unless you manually stop it.
+- `task-manager-app`: The name of the image you want to run.
+
+**Step 5: Verify the Deployment**
+
+Check if the container is running and view its logs to ensure there were no startup errors.
+
+```bash
+# List running containers
+docker ps
+
+# View the container's logs
+docker logs my-task-manager
+```
+
+You should see the log output from `loguru`, indicating that the application and the scheduler have started successfully.
+
+**Step 6: Test the API**
+
+Finally, use `curl` or your preferred API client to send a test request to the containerized application. Remember to use the correct port (8080 in this example) and include your API key.
+
+```bash
+curl http://127.0.0.1:8080/notifications/status -H "X-API-Key: your_secret_api_key"
+```
+
+If you get a successful response, your deployment is complete!
+
+**Managing the Container**
+
+- **To stop the container:** `docker stop my-task-manager`
+- **To start it again:** `docker start my-task-manager`
+- **To remove the container:** `docker rm my-task-manager` (must be stopped first)
+
 
 ## Testing
 
