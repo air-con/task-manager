@@ -1,9 +1,10 @@
 fastapi
 uvicorn[standard]
 apscheduler
-lark-oapi
 python-dotenv
 celery
 amqp
 loguru
 Jinja2
+supabase
+supabase

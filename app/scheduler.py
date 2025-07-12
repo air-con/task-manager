@@ -31,8 +31,8 @@ async def check_and_replenish_tasks():
                 f"Task pool is low ({current_task_count}). Replenishing {tasks_to_fetch} tasks."
             )
             
-            # Get tasks from Bitable that are in PENDING state
-            new_tasks = await services.get_pending_tasks_from_bitable(tasks_to_fetch)
+            # Get tasks from Supabase that are in PENDING state
+            new_tasks = await services.get_pending_tasks(tasks_to_fetch)
             
             if not new_tasks:
                 logger.info("No pending tasks available to replenish.")
@@ -44,11 +44,11 @@ async def check_and_replenish_tasks():
                 logger.info(f"Publishing tasks in multi-mode with batch size {batch_size}.")
                 chunked_tasks = [new_tasks[i:i + batch_size] for i in range(0, len(new_tasks), batch_size)]
                 for chunk in chunked_tasks:
-                    services.publish_to_celery([task['fields'] for task in chunk])
+                    services.publish_to_celery([task['payload'] for task in chunk])
             else: # single mode
                 logger.info("Publishing tasks in single-mode.")
                 for task in new_tasks:
-                    services.publish_to_celery(task['fields'])
+                    services.publish_to_celery(task['payload'])
             
             # Update their status to PROCESSING
             updates = [

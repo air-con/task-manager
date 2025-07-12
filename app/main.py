@@ -44,10 +44,12 @@ async def get_status_page(request: Request):
     Serves the status dashboard page.
     """
     mq_task_count = services.get_mq_queue_size(settings.CELERY_QUEUE)
+    pending_tasks = await services.get_pending_tasks(count=100000) # Get a high number for an accurate count
     
     return templates.TemplateResponse("status.html", {
         "request": request,
         "mq_task_count": mq_task_count,
+        "pending_tasks_db": len(pending_tasks),
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
 

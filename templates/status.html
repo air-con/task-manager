@@ -19,7 +19,7 @@
     <div class="container mt-5">
         <h1 class="text-center mb-4">MQ Task Status Dashboard</h1>
         <div class="row justify-content-center">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card status-card text-center mb-4">
                     <div class="card-header fs-5">Tasks in Message Queue</div>
                     <div class="card-body">
@@ -28,8 +28,15 @@
                             <p class="card-text text-muted">Could not connect to the message queue.</p>
                         {% else %}
                             <h2 class="display-1 fw-bold">{{ mq_task_count }}</h2>
-                            <p class="card-text text-muted">Live count of messages waiting in the queue.</p>
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card status-card text-center mb-4">
+                    <div class="card-header fs-5">Pending Tasks in Database</div>
+                    <div class="card-body">
+                        <h2 class="display-1 fw-bold">{{ pending_tasks_db }}</h2>
                     </div>
                 </div>
             </div>

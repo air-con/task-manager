@@ -25,7 +25,7 @@ This project is a Python-based task management service designed to supplement an
 
 - Python 3.8+
 - Docker (optional, for containerized deployment)
-- A Feishu account with permissions to create Apps and Bitables.
+- A Supabase account (free tier is sufficient to start).
 
 ### 2. Installation
 
@@ -37,7 +37,24 @@ cd task-manager
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
+### 3. Configure Supabase
+
+1.  **Create a Supabase Project**: Go to [Supabase](https://supabase.com/) and create a new project.
+2.  **Create the `tasks` Table**: In your Supabase project, go to the **SQL Editor** and run the following script to create the `tasks` table with the correct columns and policies.
+
+    ```sql
+    CREATE TABLE public.tasks (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      payload JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    ```
+
+3.  **Get API Credentials**: In your Supabase project, go to **Project Settings > API**. You will find your **Project URL** and your **`service_role` key**. You will need these for the next step.
+
+### 4. Configure Environment Variables
 
 Create a `.env` file in the root directory of the project by copying the example file:
 
@@ -47,61 +64,11 @@ cp .env.example .env
 
 Now, edit the `.env` file and fill in the following values:
 
-- `API_KEY_HASH`: **(Required for security)** The SHA-256 hash of your secret API key. The server stores only this hash.
-- `FEISHU_APP_ID`: Your Feishu App ID.
-- `FEISHU_APP_SECRET`: Your Feishu App Secret.
-- `FEISHU_BITABLE_APP_TOKEN`: The App Token for your Bitable.
-- `FEISHU_BITABLE_TABLE_ID`: The Table ID for your Bitable table.
-- `FEISHU_ROBOT_WEBHOOK_URL`: The webhook URL for your Feishu bot.
-- `CELERY_APP_NAME`: The name of your Celery application (e.g., `wqb`).
-- `CELERY_BROKER_URL`: The URL for your Celery message broker (e.g., `pyamqp://guest:guest@localhost:5672//`).
-- `CELERY_TASK_NAME`: The full name of the target task to be executed (e.g., `wqb.tasks.simulate_task`).
-- `CELERY_QUEUE`: The target Celery queue.
-- `CELERY_DEFAULT_PRIORITY`: The priority for regular, scheduled tasks (e.g., `5`).
-- `CELERY_HIGH_PRIORITY`: The priority for urgent, manually queued tasks (e.g., `1`).
-
-### 4. Prepare Your Feishu Bitable
-
-For this application to work correctly, you must set up a Feishu Bitable table with specific columns. The application will read from and write to these columns.
-
-#### Mandatory Columns
-
-These two columns are **required** for the core logic of the task manager.
-
-| Column Name  | Column Type      | Description                                                                                                                              |
-| :----------- | :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| `Identifier` | `Single-line text` | **Crucial for preventing duplicates.** This field stores a unique MD5 hash of the task content. The application manages this automatically. |
-| `Status`     | `Single-select`  | **Tracks the task lifecycle.** You **must** create this column with the following four options (case-sensitive): `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`. |
-
-#### Custom Data Columns
-
-You need to add columns that correspond to the keys in the JSON data you plan to send to the application. The application will automatically map the JSON keys to the column names.
-
-**Example:**
-
-If you plan to send tasks with the following JSON structure:
-
-```json
-{
-  "url": "https://example.com/data/1",
-  "customer_id": "CUST-007",
-  "retry_count": 3
-}
-```
-
-Then, in addition to the mandatory columns, you would need to create the following columns in your Bitable:
-
-| Column Name     | Column Type | Description                               |
-| :-------------- | :---------- | :---------------------------------------- |
-| `url`           | `URL` or `Text` | To store the URL from the task.           |
-| `customer_id`   | `Text`      | To store the customer's unique ID.        |
-| `retry_count`   | `Number`    | To store the number of retries.           |
-
-Your final table structure would look something like this:
-
-| Identifier (Text) | Status (Select) | url (URL) | customer_id (Text) | retry_count (Number) |
-| :---------------- | :-------------- | :-------- | :----------------- | :------------------- |
-| (auto-generated)  | PENDING         | ...       | ...                | ...                  |
+- `SUPABASE_URL`: Your Supabase project URL.
+- `SUPABASE_KEY`: Your Supabase `service_role` key.
+- `API_KEY_HASH`: The SHA-256 hash of your secret API key for client authentication.
+- `CELERY_BROKER_URL`: The URL for your Celery message broker.
+- ... (and other Celery/Scheduler settings)
 
 
 ## How to Run

@@ -1,3 +1,5 @@
+import hashlib
+import json
 from loguru import logger
 from fastapi import APIRouter, HTTPException, Body, Depends, Header
 from typing import List, Dict, Any, TypedDict, Union
@@ -37,52 +39,23 @@ async def api_key_auth(x_api_key: str = Header(None)):
 @router.post("/tasks/ingest")
 async def ingest_data(data: List[Dict[str, Any]] = Body(...)):
     """
-    Receives data, checks for duplicates, and saves it to the Bitable with PENDING status.
-    The duplication check is based on a hash of the item's content.
+    Receives data, creates task records, and saves them to the database.
     """
-    records_to_add = []
-    for item in data:
-        # Create a canonical JSON string for both hashing and storing.
-        # sort_keys ensures consistent hashing.
-        # ensure_ascii=False preserves non-ASCII characters.
-        payload_json = json.dumps(item, sort_keys=True, ensure_ascii=False)
-        identifier = hashlib.md5(payload_json.encode()).hexdigest()
-        records_to_add.append({
-            "id": identifier,
-            "status": StatusEnum.PENDING,
-            "payload": payload_json
-        })
-
-    if not records_to_add:
+    if not data:
         return {"message": "Empty input.", "tasks_added": 0}
 
+    records_to_add = services.create_task_records(data, StatusEnum.PENDING)
+    
     try:
-        # Optimistic batch insert
-        added_tasks = await services.add_records_to_bitable(records_to_add)
+        added_tasks = await services.add_tasks(records_to_add)
         return {
-            "message": "Data ingested successfully.",
+            "message": "Data ingestion complete.",
             "tasks_added": len(added_tasks),
             "tasks_duplicated": len(records_to_add) - len(added_tasks)
         }
     except Exception as e:
-        # If batch fails due to duplicates, fallback to individual inserts
-        if "duplicate" in str(e).lower():
-            logger.warning("Batch insert failed due to duplicates, falling back to individual inserts.")
-            successful_inserts = 0
-            duplicate_inserts = 0
-            for record in records_to_add:
-                if await services.add_single_record(record):
-                    successful_inserts += 1
-                else:
-                    duplicate_inserts += 1
-            return {
-                "message": "Data ingested with some duplicates.",
-                "tasks_added": successful_inserts,
-                "tasks_duplicated": duplicate_inserts
-            }
-        else:
-            # For other errors, re-raise
-            raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error during data ingestion: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred during data ingestion.")
 
 @router.post("/tasks/priority-queue")
 async def priority_queue_task(tasks: Union[Dict[str, Any], List[Dict[str, Any]]] = Body(...), priority: int = 5):
@@ -97,22 +70,14 @@ async def priority_queue_task(tasks: Union[Dict[str, Any], List[Dict[str, Any]]]
         # Publish to Celery first with the specified priority
         services.publish_to_celery(tasks_list, priority=priority)
         
-        # Then, add to Bitable with PROCESSING status
-        records_to_add = []
-        for task in tasks_list:
-            payload_json = json.dumps(task, sort_keys=True, ensure_ascii=False)
-            identifier = hashlib.md5(payload_json.encode()).hexdigest()
-            records_to_add.append({
-                "id": identifier,
-                "status": StatusEnum.PROCESSING,
-                "payload": payload_json
-            })
-            
-        await services.add_records_to_bitable(records_to_add)
+        # Then, create and save records to the database
+        records_to_add = services.create_task_records(tasks_list, StatusEnum.PROCESSING)
+        await services.add_tasks(records_to_add)
         
         return {"message": "High-priority tasks published and saved successfully."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error in priority queue task: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing the priority task.")
 
 @router.post("/tasks/update-status")
 async def update_task_status(updates: List[StatusUpdate] = Body(...)):
@@ -141,7 +106,7 @@ async def update_task_status(updates: List[StatusUpdate] = Body(...)):
         })
 
     try:
-        await services.update_records_in_bitable(bitable_updates)
+        await services.update_tasks(bitable_updates)
         return {"message": "Task statuses updated successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
