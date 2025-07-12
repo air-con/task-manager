@@ -46,6 +46,7 @@ cp .env.example .env
 
 Now, edit the `.env` file and fill in the following values:
 
+- `API_KEY_HASH`: **(Required for security)** The SHA-256 hash of your secret API key. The server stores only this hash.
 - `FEISHU_APP_ID`: Your Feishu App ID.
 - `FEISHU_APP_SECRET`: Your Feishu App Secret.
 - `FEISHU_BITABLE_APP_TOKEN`: The App Token for your Bitable.
@@ -127,6 +128,93 @@ docker run -d -p 8080:80 --env-file .env --name task-manager-app task-manager
 ```
 
 The API will be available at `http://localhost:8080`.
+
+## Testing
+
+Once the application is running, you can use `curl` or any API client to test the endpoints. The following examples assume the application is running locally on port 8000 and you have set your `API_KEY` in the `.env` file.
+
+**All requests must include the `X-API-Key` header.**
+
+### 1. Toggle Notifications
+
+By default, notifications are off. You can enable them for testing.
+
+**Enable Notifications:**
+```bash
+curl -X POST http://127.0.0.1:8000/notifications/toggle -H "Content-Type: application/json" -H "X-API-Key: your_secret_api_key" -d '{"enabled": true}'
+```
+
+**Check Status:**
+```bash
+curl http://127.0.0.1:8000/notifications/status -H "X-API-Key: your_secret_api_key"
+```
+
+### 2. Ingest New Tasks
+
+This endpoint adds new tasks to the Bitable with `PENDING` status. It prevents duplicates based on the task content.
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks/ingest -H "Content-Type: application/json" -H "X-API-Key: your_secret_api_key" -d '[
+  {"customer_id": "CUST-001", "data": "some_payload_1"},
+  {"customer_id": "CUST-002", "data": "some_payload_2"}
+]'
+```
+
+If you run the same command again, the response will indicate that 0 tasks were added and 2 were duplicates.
+
+### 3. Add High-Priority Tasks
+
+This endpoint sends tasks directly to the message queue and saves them to the Bitable with `PROCESSING` status.
+
+**Default (Medium) Priority:**
+```bash
+curl -X POST http://127.0.0.1:8000/tasks/priority-queue -H "Content-Type: application/json" -H "X-API-Key: your_secret_api_key" -d '[
+  {"customer_id": "CUST-003", "data": "urgent_payload_3"}
+]'
+```
+
+**Custom (High) Priority:**
+```bash
+curl -X POST "http://127.0.0.1:8000/tasks/priority-queue?priority=9" -H "Content-Type: application/json" -H "X-API-Key: your_secret_api_key" -d '[
+  {"customer_id": "CUST-004", "data": "critical_payload_4"}
+]'
+```
+
+### 4. Update Task Status
+
+This endpoint updates the status of existing tasks. You need to get the `record_id` from your Feishu Bitable first.
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks/update-status -H "Content-Type: application/json" -H "X-API-Key: your_secret_api_key" -d '[
+  {"record_id": "rec_xxxxxxxx", "status": "SUCCESS"},
+  {"record_id": "rec_yyyyyyyy", "status": "FAILED"}
+]'
+```
+
+### Generating a Secure Key and Hash
+
+For production environments, you should use a long, randomly generated secret key. The client will use this key in the `X-API-Key` header. The server, however, only needs to know the SHA-256 hash of this key.
+
+**1. Generate a Secret Key:**
+
+Use this command to generate a cryptographically secure key:
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+# Example Output: 1a2b3c4d...
+```
+Keep this key safe and provide it to your API clients.
+
+**2. Generate the Hash for the Server:**
+
+Take the key you just generated and use this command to create its SHA-256 hash:
+```bash
+python -c "import hashlib; print(hashlib.sha256('your_secret_key_here'.encode()).hexdigest())"
+# Example Output: 8c6976e5...
+```
+
+**3. Configure the Server:**
+
+Copy the resulting hash and set it as the value for `API_KEY_HASH` in your `.env` file.
 
 ## API Endpoints
 

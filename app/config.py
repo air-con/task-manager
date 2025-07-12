@@ -21,6 +21,14 @@ class Settings:
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL")
     CELERY_TASK_NAME: str = os.getenv("CELERY_TASK_NAME")
     CELERY_QUEUE: str = os.getenv("CELERY_QUEUE")
+
+    import hashlib
+
+class Settings:
+    # ... (other settings)
+
+    # Security
+    API_KEY_HASH: str = os.getenv("API_KEY_HASH")
     
 
 settings = Settings()

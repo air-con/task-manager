@@ -1,8 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
 
-from .api import router as api_router
+from .api import router as api_router, api_key_auth
 from .scheduler import check_and_replenish_tasks
 
 @asynccontextmanager
@@ -25,7 +25,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.include_router(api_router, prefix="/api", tags=["Tasks"])
+app.include_router(api_router, prefix="/api", tags=["Tasks"], dependencies=[Depends(api_key_auth)])
 
 @app.get("/")
 async def root():
