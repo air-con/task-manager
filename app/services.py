@@ -99,6 +99,59 @@ async def add_single_record(record: BitableRecord) -> bool:
         # For other errors, we should not suppress them.
         raise e
 
+def get_mq_queue_size(queue_name: str) -> int:
+    """
+    Gets the number of messages in a specific RabbitMQ queue.
+
+    Returns:
+        The number of messages in the queue, or -1 if an error occurs.
+    """
+    try:
+        with celery_app.connection_for_read() as conn:
+            with conn.channel() as channel:
+                # passive=True ensures we don't create the queue if it doesn't exist.
+                _, message_count, _ = channel.queue_declare(queue=queue_name, passive=True)
+                return message_count
+    except Exception as e:
+        logger.error(f"Could not connect to RabbitMQ or get queue size for '{queue_name}'. Error: {e}")
+        return -1
+
+async def get_processing_tasks_count() -> int:
+    """
+    Gets the count of tasks with 'PROCESSING' status.
+    """
+    client = get_lark_client()
+    try:
+        request = ListAppTableRecordRequest.builder() \
+            .app_token(settings.FEISHU_BITABLE_APP_TOKEN) \
+            .table_id(settings.FEISHU_BITABLE_TABLE_ID) \
+            .filter('CurrentValue.[status] = "PROCESSING"') \
+            .page_size(1) \
+            .build()
+        
+        response = await client.bitable.v1.app_table_record.alist(request)
+        if response.success():
+            return response.data.total
+        return 0
+    except Exception as e:
+        logger.error(f"Error getting processing tasks count: {e}")
+        return 0
+
+def get_latest_error_logs(count: int = 5) -> List[str]:
+    """
+    Retrieves the last N lines from the error log file.
+    """
+    try:
+        with open("logs/app_errors.log", "r") as f:
+            # Read all lines and return the last `count` lines
+            lines = f.readlines()
+            return lines[-count:]
+    except FileNotFoundError:
+        return ["Error log file not found."]
+    except Exception as e:
+        logger.error(f"Error reading error log file: {e}")
+        return ["An error occurred while reading the log file."]
+
 async def get_pending_tasks_from_bitable(count: int) -> List[Dict[str, Any]]:
     """
     Gets a specified number of tasks with 'PENDING' status.

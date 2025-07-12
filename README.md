@@ -4,6 +4,7 @@ This project is a Python-based task management service designed to supplement an
 
 ## Features
 
+- **Visual Monitoring Dashboard**: A simple, auto-refreshing web page to monitor the number of pending tasks in the queue.
 - **Automatic Task Replenishment**: A scheduled job runs every 4 hours to check the task pool and automatically adds new tasks if the count falls below a specified threshold.
 - **Data Ingestion API**: An endpoint to submit new tasks. It includes a mechanism to prevent duplicate entries.
 - **Priority Queue API**: An endpoint to inject high-priority tasks directly into the processing queue.
@@ -114,6 +115,10 @@ uvicorn app.main:app --reload
 ```
 
 The API will be available at `http://127.0.0.1:8000`.
+
+**Monitoring Dashboard**
+
+The visual dashboard is available at `http://127.0.0.1:8000/status`. Note that this page does not require an API key.
 
 ### Docker Deployment (Step-by-Step)
 

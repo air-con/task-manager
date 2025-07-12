@@ -8,15 +8,19 @@ TASK_POOL_THRESHOLD_RATIO = 0.6
 
 async def check_and_replenish_tasks():
     """
-    Checks the number of tasks in the MQ (simulated) and replenishes them from the database if below a threshold.
+    Checks the number of tasks in the MQ and replenishes them from the database if below a threshold.
     """
     try:
         task_pool_threshold = int(settings.SCHEDULER_TASK_REPLENISH_COUNT * TASK_POOL_THRESHOLD_RATIO)
-
-        pending_tasks = await services.get_pending_tasks_from_bitable(task_pool_threshold + 1)
-        current_task_count = len(pending_tasks)
         
-        logger.info(f"Current pending tasks: {current_task_count}. Threshold: {task_pool_threshold}")
+        # Get the current queue size directly from RabbitMQ
+        current_task_count = services.get_mq_queue_size(settings.CELERY_QUEUE)
+
+        if current_task_count == -1:
+            logger.error("Could not get task count from MQ. Skipping replenishment cycle.")
+            return
+
+        logger.info(f"Current tasks in MQ: {current_task_count}. Threshold: {task_pool_threshold}")
 
         if current_task_count < task_pool_threshold:
             tasks_to_fetch = settings.SCHEDULER_TASK_REPLENISH_COUNT - current_task_count

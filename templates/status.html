@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQ Task Status</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta http-equiv="refresh" content="15"> <!-- Auto-refresh every 15 seconds -->
+    <style>
+        body { background-color: #f8f9fa; }
+        .status-card { 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .status-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">MQ Task Status Dashboard</h1>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card status-card text-center mb-4">
+                    <div class="card-header fs-5">Tasks in Message Queue</div>
+                    <div class="card-body">
+                        {% if mq_task_count == -1 %}
+                            <h2 class="display-1 fw-bold text-danger">ERROR</h2>
+                            <p class="card-text text-muted">Could not connect to the message queue.</p>
+                        {% else %}
+                            <h2 class="display-1 fw-bold">{{ mq_task_count }}</h2>
+                            <p class="card-text text-muted">Live count of messages waiting in the queue.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="text-center text-muted mt-4">
+            Last updated: {{ last_updated }}
+        </div>
+    </div>
+</body>
+</html>

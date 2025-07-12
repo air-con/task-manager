@@ -22,4 +22,15 @@ def setup_logging():
         backtrace=True,
         diagnose=True
     )
+    logger.add(
+        "logs/app_errors.log",
+        level="ERROR",
+        rotation="10 MB",
+        retention="30 days",
+        compression="zip",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
+        enqueue=True,
+        backtrace=True,
+        diagnose=True
+    )
     logger.info("Logger configured successfully.")

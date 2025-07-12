@@ -1,10 +1,13 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
+from fastapi.templating import Jinja2Templates
+from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
 
 from .api import router as api_router, api_key_auth
 from .scheduler import check_and_replenish_tasks
 from .logging_config import setup_logging
+from . import services
 
 # Setup logging as the first step
 setup_logging()
@@ -30,6 +33,23 @@ app = FastAPI(
 )
 
 app.include_router(api_router, prefix="/api", tags=["Tasks"], dependencies=[Depends(api_key_auth)])
+
+# --- UI Endpoint ---
+
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/status", response_class=HTMLResponse)
+async def get_status_page(request: Request):
+    """
+    Serves the status dashboard page.
+    """
+    mq_task_count = services.get_mq_queue_size(settings.CELERY_QUEUE)
+    
+    return templates.TemplateResponse("status.html", {
+        "request": request,
+        "mq_task_count": mq_task_count,
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
 
 @app.get("/")
 async def root():

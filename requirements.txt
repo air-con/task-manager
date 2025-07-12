@@ -6,3 +6,4 @@ python-dotenv
 celery
 amqp
 loguru
+Jinja2
