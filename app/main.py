@@ -4,18 +4,22 @@ from contextlib import asynccontextmanager
 
 from .api import router as api_router, api_key_auth
 from .scheduler import check_and_replenish_tasks
+from .logging_config import setup_logging
+
+# Setup logging as the first step
+setup_logging()
 
 @asynccontextmanager
-asynce def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):
     # Startup
-    print("Starting up the application...")
+    logger.info("Starting up the application...")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(check_and_replenish_tasks, 'interval', hours=4)
     scheduler.start()
-    print("Scheduler started. Will run every 4 hours.")
+    logger.info("Scheduler started. Will run every 4 hours.")
     yield
     # Shutdown
-    print("Shutting down...")
+    logger.info("Shutting down...")
     scheduler.shutdown()
 
 app = FastAPI(

@@ -1,5 +1,4 @@
-import hashlib
-import json
+from loguru import logger
 from fastapi import APIRouter, HTTPException, Body, Depends, Header
 from typing import List, Dict, Any, TypedDict
 
@@ -68,7 +67,7 @@ async def ingest_data(data: List[Dict[str, Any]] = Body(...)):
     except Exception as e:
         # If batch fails due to duplicates, fallback to individual inserts
         if "duplicate" in str(e).lower():
-            print("Batch insert failed due to duplicates, falling back to individual inserts.")
+            logger.warning("Batch insert failed due to duplicates, falling back to individual inserts.")
             successful_inserts = 0
             duplicate_inserts = 0
             for record in records_to_add:

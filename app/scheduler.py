@@ -1,3 +1,5 @@
+from loguru import logger
+
 from . import services
 from .config import settings
 
@@ -16,7 +18,7 @@ async def check_and_replenish_tasks():
         pending_tasks = await services.get_pending_tasks_from_bitable(TASK_POOL_THRESHOLD + 1)
         current_task_count = len(pending_tasks)
         
-        print(f"Current pending tasks: {current_task_count}. Threshold: {TASK_POOL_THRESHOLD}")
+        logger.info(f"Current pending tasks: {current_task_count}. Threshold: {TASK_POOL_THRESHOLD}")
 
         if current_task_count < TASK_POOL_THRESHOLD:
             tasks_to_fetch = TASK_REPLENISH_COUNT - current_task_count
@@ -31,7 +33,7 @@ async def check_and_replenish_tasks():
             new_tasks = await services.get_pending_tasks_from_bitable(tasks_to_fetch)
             
             if not new_tasks:
-                print("No pending tasks available to replenish.")
+                logger.info("No pending tasks available to replenish.")
                 return
 
             # Chunk tasks into groups of 10 before publishing
@@ -48,8 +50,8 @@ async def check_and_replenish_tasks():
             ]
             await services.update_records_in_bitable(updates)
             
-            print(f"Successfully replenished {len(new_tasks)} tasks.")
+            logger.info(f"Successfully replenished {len(new_tasks)} tasks.")
 
     except Exception as e:
-        print(f"Error during scheduled task check: {e}")
+        logger.error(f"Error during scheduled task check: {e}")
         await services.send_feishu_notification(f"ERROR: Task replenishment failed: {e}")

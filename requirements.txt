@@ -5,3 +5,4 @@ lark-oapi
 python-dotenv
 celery
 amqp
+loguru

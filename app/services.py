@@ -1,3 +1,5 @@
+from loguru import logger
+
 import httpx
 import lark_oapi as lark
 from lark_oapi.api.bitable.v1 import *
@@ -124,7 +126,7 @@ def publish_to_celery(tasks: Any, priority: int = None):
     )
     task_count = len(tasks) if isinstance(tasks, list) else 1
     priority_str = f" with priority {priority}" if priority is not None else ""
-    print(f"Sent {task_count} tasks to Celery queue '{settings.CELERY_QUEUE}'{priority_str}.")
+    logger.info(f"Sent {task_count} tasks to Celery queue '{settings.CELERY_QUEUE}'{priority_str}.")
 
 from . import state
 
@@ -136,7 +138,7 @@ async def send_feishu_notification(message: str):
         return
 
     if not settings.FEISHU_ROBOT_WEBHOOK_URL:
-        print("FEISHU_ROBOT_WEBHOOK_URL not set, skipping notification.")
+        logger.warning("FEISHU_ROBOT_WEBHOOK_URL not set, skipping notification.")
         return
 
     async with httpx.AsyncClient() as client:
@@ -148,4 +150,4 @@ async def send_feishu_notification(message: str):
             response = await client.post(settings.FEISHU_ROBOT_WEBHOOK_URL, json=payload)
             response.raise_for_status()
         except httpx.RequestError as e:
-            print(f"Failed to send Feishu notification: {e}")
+            logger.error(f"Failed to send Feishu notification: {e}")
