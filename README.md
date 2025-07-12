@@ -284,6 +284,29 @@ python -c "import hashlib; print(hashlib.sha256('your_secret_key_here'.encode())
 
 Copy the resulting hash and set it as the value for `API_KEY_HASH` in your `.env` file.
 
+## Continuous Deployment (CI/CD)
+
+This project includes a GitHub Actions workflow to automatically build and publish the Docker image to Docker Hub.
+
+### How It Works
+
+The workflow is defined in `.github/workflows/docker-publish.yml` and is triggered by two events:
+
+1.  **Push to `main` branch**: When code is pushed or merged to the `main` branch, a new Docker image is built and pushed with the `latest` tag.
+2.  **New Release**: When you create a new release on GitHub (e.g., `v1.2.0`), a new Docker image is built and pushed with a tag matching the release version.
+
+### Setup
+
+To enable this workflow, you need to configure secrets in your GitHub repository:
+
+1.  **Create a Docker Hub Access Token**: Go to your Docker Hub account settings, navigate to **Security**, and create a new access token with **Read & Write** permissions.
+2.  **Add Secrets to GitHub**: In your GitHub repository, go to **Settings > Secrets and variables > Actions** and add the following two repository secrets:
+    - `DOCKER_USERNAME`: Your Docker Hub username.
+    - `DOCKER_PASSWORD`: The access token you just generated.
+
+Once these secrets are in place, the workflow will run automatically on the next push to `main` or the next release publication.
+
+
 ## API Endpoints
 
 All endpoints are prefixed with `/api`.
