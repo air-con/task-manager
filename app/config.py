@@ -9,6 +9,9 @@ class Settings:
     SUPABASE_URL: str = os.getenv("SUPABASE_URL")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY")
 
+    # Momento Cache
+    MOMENTO_API_KEY: str = os.getenv("MOMENTO_API_KEY")
+
     # Celery Configuration
     CELERY_APP_NAME: str = os.getenv("CELERY_APP_NAME")
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL")

@@ -19,7 +19,17 @@ This project is a Python-based task management service designed to supplement an
 3.  **Priority Tasks**: Tasks submitted to `/api/tasks/priority-queue` are immediately published to the MQ and saved in the Bitable with a `PROCESSING` status.
 4.  **Status Updates**: External systems can call `/api/tasks/update-status` to change the status of tasks in the Bitable once they are completed or have failed.
 
-## Setup and Configuration
+## Core Architecture: Hot & Cold Data Separation
+
+To handle potentially massive data volumes while maintaining high performance and low cost, this project implements a **hot/cold data separation strategy**.
+
+- **Hot Data (Active Tasks)**: Stored in **Supabase (PostgreSQL)**. This includes tasks that are currently `PENDING` or `PROCESSING`. Supabase provides a robust, queryable database for active tasks.
+
+- **Cold Data (Archived Task IDs)**: Stored in **Momento Cache**. To prevent the Supabase database from growing indefinitely, a daily background job archives the IDs of all `SUCCESS` and `FAILED` tasks into a high-performance, low-cost Set in Momento. After archiving, these tasks are deleted from Supabase.
+
+This approach allows the system to check for duplicates against a virtually infinite history of task IDs stored in Momento, while keeping the primary Supabase database small, fast, and within the free tier limits.
+
+### Setup and Configuration
 
 ### 1. Prerequisites
 
@@ -54,7 +64,13 @@ pip install -r requirements.txt
 
 3.  **Get API Credentials**: In your Supabase project, go to **Project Settings > API**. You will find your **Project URL** and your **`service_role` key**. You will need these for the next step.
 
-### 4. Configure Environment Variables
+### 4. Configure Momento Cache
+
+1.  **Create a Momento Account**: Go to the [Momento Console](https://console.gomomento.com/) and sign up.
+2.  **Create a Cache**: Create a cache and give it a name, for example, `task-archive`.
+3.  **Generate an API Key**: Create an API key with a long TTL (e.g., 1 year). You will need this key for the environment variables.
+
+### 5. Configure Environment Variables
 
 Create a `.env` file in the root directory of the project by copying the example file:
 
@@ -66,6 +82,7 @@ Now, edit the `.env` file and fill in the following values:
 
 - `SUPABASE_URL`: Your Supabase project URL.
 - `SUPABASE_KEY`: Your Supabase `service_role` key.
+- `MOMENTO_API_KEY`: Your Momento API key for ID archiving.
 - `API_KEY_HASH`: The SHA-256 hash of your secret API key for client authentication.
 - `CELERY_BROKER_URL`: The URL for your Celery message broker.
 - ... (and other Celery/Scheduler settings)

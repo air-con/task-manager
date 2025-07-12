@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from .api import router as api_router, api_key_auth
 from .scheduler import check_and_replenish_tasks
+from .archiver import archive_completed_tasks
 from .logging_config import setup_logging
 from . import services
 
@@ -17,7 +18,11 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up the application...")
     scheduler = AsyncIOScheduler()
+    # Schedule the main task replenishment job
     scheduler.add_job(check_and_replenish_tasks, 'interval', hours=4)
+    # Schedule the daily archival job to run at a low-traffic time, e.g., 3 AM UTC
+    scheduler.add_job(archive_completed_tasks, 'cron', hour=3, minute=0)
+    
     scheduler.start()
     logger.info("Scheduler started. Will run every 4 hours.")
     yield

@@ -10,7 +10,7 @@ class StatusUpdate(TypedDict):
     record_id: str
     status: str
 
-from . import services, state
+from . import services, state, archiver
 from .services import StatusEnum
 from .config import settings
 
@@ -39,19 +39,36 @@ async def api_key_auth(x_api_key: str = Header(None)):
 @router.post("/tasks/ingest")
 async def ingest_data(data: List[Dict[str, Any]] = Body(...)):
     """
-    Receives data, creates task records, and saves them to the database.
+    Receives data, efficiently checks for duplicates against the archive, 
+    and saves only new tasks to the database.
     """
     if not data:
         return {"message": "Empty input.", "tasks_added": 0}
 
-    records_to_add = services.create_task_records(data, StatusEnum.PENDING)
+    # 1. Create potential task records with IDs
+    potential_records = services.create_task_records(data, StatusEnum.PENDING)
+    potential_ids = [rec['id'] for rec in potential_records]
+
+    # 2. Bulk check for duplicates against Momento
+    existing_mask = await archiver.check_if_ids_exist(potential_ids)
+
+    # 3. Filter out tasks that already exist
+    new_records = [rec for rec, exists in zip(potential_records, existing_mask) if not exists]
     
+    if not new_records:
+        return {
+            "message": "All tasks are duplicates.",
+            "tasks_added": 0,
+            "tasks_duplicated": len(potential_records)
+        }
+
+    # 4. Ingest only the new tasks into Supabase
     try:
-        added_tasks = await services.add_tasks(records_to_add)
+        added_tasks = await services.add_tasks(new_records)
         return {
             "message": "Data ingestion complete.",
             "tasks_added": len(added_tasks),
-            "tasks_duplicated": len(records_to_add) - len(added_tasks)
+            "tasks_duplicated": len(potential_records) - len(added_tasks)
         }
     except Exception as e:
         logger.error(f"Error during data ingestion: {e}")

@@ -94,6 +94,28 @@ async def get_pending_tasks(count: int) -> List[Dict[str, Any]]:
             logger.error(f"Failed to get pending tasks from Supabase: {e}")
         return []
 
+async def get_completed_tasks_before(timestamp: datetime) -> List[Dict[str, Any]]:
+    """
+    Gets tasks that were completed (SUCCESS or FAILED) before a given timestamp.
+    """
+    try:
+        response = await supabase.table('tasks').select("id").in_('status', ['SUCCESS', 'FAILED']).lte('updated_at', timestamp.isoformat()).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Failed to get completed tasks from Supabase: {e}")
+        return []
+
+async def delete_tasks(ids: List[str]) -> List[Dict[str, Any]]:
+    """
+    Deletes tasks from Supabase by their IDs.
+    """
+    try:
+        response = supabase.table('tasks').delete().in_('id', ids).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Failed to delete tasks from Supabase: {e}")
+        raise
+
 def create_task_records(data: List[Dict[str, Any]], status: StatusEnum) -> List[TaskRecord]:
     """
     Creates a list of task records from raw data, including hashing for the ID.
