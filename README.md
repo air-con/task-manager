@@ -90,7 +90,33 @@ Now, edit the `.env` file and fill in the following values:
 
 ## How to Run
 
+### Quick Start (from Docker Hub)
+
+This is the recommended way to deploy the application in a production environment. It pulls the pre-built image directly from Docker Hub, requiring only Docker and a configured `.env` file on the host machine.
+
+**Prerequisites:**
+- Docker is installed and running.
+- You have a `.env` file containing all the necessary environment variables (see the "Configure Environment Variables" section).
+
+**Run Command:**
+
+```bash
+docker run \
+  -d \
+  -p 8080:80 \
+  --env-file /path/to/your/.env \
+  --name my-task-manager \
+  --restart unless-stopped \
+  your_dockerhub_username/task-manager-app:latest
+```
+
+**Note:**
+- Replace `your_dockerhub_username` with your actual Docker Hub username.
+- Replace `/path/to/your/.env` with the absolute path to your environment file.
+- The application will be available at `http://localhost:8080`.
+
 ### Local Development
+
 
 To run the application locally, use `uvicorn`:
 
@@ -251,22 +277,26 @@ For production environments, you should use a long, randomly generated secret ke
 
 Use this command to generate a cryptographically secure key:
 ```bash
-python -c "import secrets; print(secrets.token_hex(32))"
+# This command generates 32 random bytes and encodes them in hex.
+openssl rand -hex 32
 # Example Output: 1a2b3c4d...
 ```
 Keep this key safe and provide it to your API clients.
 
 **2. Generate the Hash for the Server:**
 
-Take the key you just generated and use this command to create its SHA-256 hash:
+Take the key you just generated and use this command to create its SHA-256 hash. This method works on most Linux/macOS systems.
+
 ```bash
-python -c "import hashlib; print(hashlib.sha256('your_secret_key_here'.encode()).hexdigest())"
-# Example Output: 8c6976e5...
+# Replace 'your_secret_key_here' with the key from step 1.
+# The -n flag for echo is crucial to prevent a trailing newline from being part of the hash.
+echo -n 'your_secret_key_here' | openssl dgst -sha256
+# Example Output: (stdin)= 8c6976e5...
 ```
 
 **3. Configure the Server:**
 
-Copy the resulting hash and set it as the value for `API_KEY_HASH` in your `.env` file.
+Copy the resulting hash (the part after `(stdin)= `) and set it as the value for `API_KEY_HASH` in your `.env` file.
 
 ## Continuous Deployment (CI/CD)
 
