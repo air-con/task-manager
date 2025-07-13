@@ -33,7 +33,7 @@ This approach allows the system to check for duplicates against a virtually infi
 
 ### 1. Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - Docker (optional, for containerized deployment)
 - A Supabase account (free tier is sufficient to start).
 

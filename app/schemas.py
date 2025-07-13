@@ -1,5 +1,4 @@
-from typing import List, Dict, Any
-from typing_extensions import TypedDict
+from typing import List, Dict, Any, TypedDict
 from enum import Enum
 
 class StatusEnum(str, Enum):
