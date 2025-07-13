@@ -32,20 +32,32 @@ async def archive_completed_tasks():
             logger.info("No tasks to archive. Process finished.")
             return
 
-        task_ids = [task['id'] for task in completed_tasks]
-        logger.info(f"Found {len(task_ids)} tasks to archive.")
+        task_ids_from_db = [task['id'] for task in completed_tasks]
+        logger.info(f"Found {len(task_ids_from_db)} completed tasks in DB.")
 
-        # 2. Archive IDs to Momento
-        add_response = await clients.momento_client.set_add_elements(CACHE_NAME, SET_NAME, task_ids)
+        # Check which of them are already in the archive
+        existing_mask = await check_if_ids_exist(task_ids_from_db)
+        
+        # Filter for IDs that are not yet archived
+        task_ids_to_archive = [id for id, exists in zip(task_ids_from_db, existing_mask) if not exists]
+
+        if not task_ids_to_archive:
+            logger.info("No new tasks to archive. Process finished.")
+            return
+
+        logger.info(f"Found {len(task_ids_to_archive)} new tasks to archive.")
+
+        # 2. Archive only the new IDs to Momento
+        add_response = await clients.momento_client.set_add_elements(CACHE_NAME, SET_NAME, task_ids_to_archive)
         if isinstance(add_response, responses.CacheSetAddElements.Success):
-            logger.info(f"Successfully archived {len(task_ids)} IDs to Momento.")
+            logger.info(f"Successfully archived {len(task_ids_to_archive)} IDs to Momento.")
         else:
             logger.error(f"Failed to archive IDs to Momento: {add_response}")
             return # Do not proceed with deletion if archival fails
 
-        # 3. Delete archived tasks from Supabase
-        delete_response = await services.delete_tasks(task_ids)
-        logger.info(f"Successfully deleted {len(delete_response)} tasks from Supabase.")
+        # 3. Delete the newly archived tasks from Supabase
+        delete_response = await services.delete_tasks(task_ids_to_archive)
+        logger.info(f"Successfully initiated deletion for {len(task_ids_to_archive)} tasks from Supabase.")
 
         logger.info("Task archival process finished successfully.")
 

@@ -33,13 +33,15 @@ celery_app = Celery(settings.CELERY_APP_NAME, broker=settings.CELERY_BROKER_URL)
 
 # --- Database Operations (Async Supabase) ---
 
-async def _get_supabase_headers() -> Dict[str, str]:
-    return {
+async def _get_supabase_headers(prefer_return: bool = True) -> Dict[str, str]:
+    headers = {
         "apikey": settings.SUPABASE_KEY,
         "Authorization": f"Bearer {settings.SUPABASE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=representation",
     }
+    if prefer_return:
+        headers["Prefer"] = "return=representation"
+    return headers
 
 async def add_tasks(records: List[TaskRecord]) -> List[Dict[str, Any]]:
     """
@@ -98,15 +100,17 @@ async def get_completed_tasks_before(timestamp: datetime) -> List[Dict[str, Any]
         logger.error(f"Failed to get completed tasks from Supabase: {e}")
         return []
 
-async def delete_tasks(ids: List[str]) -> List[Dict[str, Any]]:
+async def delete_tasks(ids: List[str]):
     """
-    Deletes tasks from Supabase by their IDs.
+    Deletes tasks from Supabase by their IDs without returning the data.
     """
+    headers = await _get_supabase_headers(prefer_return=False)
+    url = f"{config.settings.SUPABASE_URL}/rest/v1/tasks"
     try:
-        response = supabase.table('tasks').delete().in_('id', ids).execute()
-        return response.data
-    except Exception as e:
-        logger.error(f"Failed to delete tasks from Supabase: {e}")
+        response = await clients.httpx_client.delete(url, headers=headers, params={"id": f"in.({', '.join(ids)})"})
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error while deleting tasks: {e.response.text}")
         raise
 
 def create_task_records(data: List[Dict[str, Any]], status: StatusEnum) -> List[TaskRecord]:

@@ -8,4 +8,5 @@ loguru
 Jinja2
 supabase
 momento
+typing-extensions
 supabase
