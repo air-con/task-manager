@@ -9,6 +9,7 @@ from celery import Celery
 
 from .config import settings
 from . import clients, state
+from .schemas import StatusEnum, TaskRecord, TaskUpdate
 
 # --- Type Definitions ---
 
@@ -48,7 +49,7 @@ async def add_tasks(records: List[TaskRecord]) -> List[Dict[str, Any]]:
     Adds or updates a list of records in the Supabase 'tasks' table using a shared httpx client.
     """
     headers = await _get_supabase_headers()
-    url = f"{config.settings.SUPABASE_URL}/rest/v1/tasks"
+    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
     
     try:
         response = await clients.httpx_client.post(url, headers=headers, json=records, params={"on_conflict": "id"})
@@ -65,7 +66,7 @@ async def update_tasks(updates: List[TaskUpdate]):
     """
     headers = await _get_supabase_headers()
     for update in updates:
-        url = f"{config.settings.SUPABASE_URL}/rest/v1/tasks?id=eq.{update['record_id']}"
+        url = f"{settings.SUPABASE_URL}/rest/v1/tasks?id=eq.{update['record_id']}"
         try:
             await clients.httpx_client.patch(url, headers=headers, json=update['fields'])
         except httpx.HTTPStatusError as e:
@@ -76,7 +77,7 @@ async def get_pending_tasks(count: int) -> List[Dict[str, Any]]:
     Gets a specified number of tasks with 'PENDING' status from Supabase using a shared httpx client.
     """
     headers = await _get_supabase_headers()
-    url = f"{config.settings.SUPABASE_URL}/rest/v1/tasks"
+    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
     params = {"status": "eq.PENDING", "limit": str(count), "select": "*"}
     
     try:
@@ -105,7 +106,7 @@ async def delete_tasks(ids: List[str]):
     Deletes tasks from Supabase by their IDs without returning the data.
     """
     headers = await _get_supabase_headers(prefer_return=False)
-    url = f"{config.settings.SUPABASE_URL}/rest/v1/tasks"
+    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
     try:
         response = await clients.httpx_client.delete(url, headers=headers, params={"id": f"in.({', '.join(ids)})"})
         response.raise_for_status()
