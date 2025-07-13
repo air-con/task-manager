@@ -3,16 +3,14 @@ from datetime import datetime, timedelta
 from momento import CacheClient, Configurations, CredentialProvider
 from momento.responses import CacheSetAddElements, CacheSetContainsElements
 
-from . import services
-from .config import settings
+from . import services, clients
 
 CACHE_NAME = "task-archive"
 SET_NAME = "processed-task-ids"
 
 # --- Momento Client Initialization ---
 
-credential_provider = CredentialProvider.from_string(settings.MOMENTO_API_KEY)
-cache_client = CacheClient(Configurations.Laptop.v1(), credential_provider, default_ttl=timedelta(days=365*10)) # 10-year TTL
+# The client is now initialized in app/main.py and shared via app/clients.py
 
 # --- Archiver Logic ---
 
@@ -37,7 +35,7 @@ async def archive_completed_tasks():
         logger.info(f"Found {len(task_ids)} tasks to archive.")
 
         # 2. Archive IDs to Momento
-        add_response = await cache_client.set_add_elements(CACHE_NAME, SET_NAME, task_ids)
+        add_response = await clients.momento_client.set_add_elements(CACHE_NAME, SET_NAME, task_ids)
         if isinstance(add_response, CacheSetAddElements.Success):
             logger.info(f"Successfully archived {len(task_ids)} IDs to Momento.")
         else:
@@ -63,13 +61,10 @@ async def check_if_ids_exist(ids: List[str]) -> List[bool]:
         return []
     
     try:
-        response = await cache_client.set_contains_elements(CACHE_NAME, SET_NAME, ids)
+        response = await clients.momento_client.set_contains_elements(CACHE_NAME, SET_NAME, ids)
         if isinstance(response, CacheSetContainsElements.Success):
             return response.contains_elements
         else:
             logger.error(f"Failed to check IDs in Momento: {response}")
             # In case of failure, assume all might be duplicates to be safe.
             return [True] * len(ids)
-    except Exception as e:
-        logger.error(f"An error occurred while checking IDs in Momento: {e}")
-        return [True] * len(ids)

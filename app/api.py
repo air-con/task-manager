@@ -1,17 +1,11 @@
+from typing import List, Dict, Any, Union
 import hashlib
 import json
 from loguru import logger
 from fastapi import APIRouter, HTTPException, Body, Depends, Header
-from typing import List, Dict, Any, TypedDict, Union
-
-# --- Type Definitions ---
-
-class StatusUpdate(TypedDict):
-    record_id: str
-    status: str
 
 from . import services, state, archiver
-from .services import StatusEnum
+from .schemas import StatusEnum, StatusUpdate
 from .config import settings
 
 router = APIRouter()
@@ -66,9 +60,9 @@ async def ingest_data(data: List[Dict[str, Any]] = Body(...)):
     try:
         added_tasks = await services.add_tasks(new_records)
         return {
-            "message": "Data ingestion complete.",
-            "tasks_added": len(added_tasks),
-            "tasks_duplicated": len(potential_records) - len(added_tasks)
+            "message": "Data ingestion processed.",
+            "tasks_processed": len(added_tasks),
+            "archived_duplicates_found": len(potential_records) - len(new_records)
         }
     except Exception as e:
         logger.error(f"Error during data ingestion: {e}")

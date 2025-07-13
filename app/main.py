@@ -1,14 +1,21 @@
 from fastapi import FastAPI, Depends, Request
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
+from loguru import logger
 
+from . import services, clients, state
 from .api import router as api_router, api_key_auth
 from .scheduler import check_and_replenish_tasks
 from .archiver import archive_completed_tasks
 from .logging_config import setup_logging
-from . import services
+from .config import settings
+
+from momento import CacheClient, Configurations, CredentialProvider
+from datetime import timedelta
+import httpx
 
 # Setup logging as the first step
 setup_logging()
@@ -17,18 +24,31 @@ setup_logging()
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up the application...")
-    scheduler = AsyncIOScheduler()
-    # Schedule the main task replenishment job
-    scheduler.add_job(check_and_replenish_tasks, 'interval', hours=4)
-    # Schedule the daily archival job to run at a low-traffic time, e.g., 3 AM UTC
-    scheduler.add_job(archive_completed_tasks, 'cron', hour=3, minute=0)
     
+    # Initialize and store shared clients
+    clients.httpx_client = httpx.AsyncClient()
+    clients.momento_client = CacheClient(
+        Configurations.Laptop.v1(), 
+        CredentialProvider.from_string(settings.MOMENTO_API_KEY), 
+        default_ttl=timedelta(days=365*10)
+    )
+    logger.info("HTTPX and Momento clients initialized.")
+
+    # Initialize and start the scheduler
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(check_and_replenish_tasks, 'interval', hours=4)
+    scheduler.add_job(archive_completed_tasks, 'cron', hour=3, minute=0)
     scheduler.start()
-    logger.info("Scheduler started. Will run every 4 hours.")
+    logger.info("Scheduler started.")
+    
     yield
+    
     # Shutdown
     logger.info("Shutting down...")
+    await clients.httpx_client.aclose()
+    clients.momento_client.close()
     scheduler.shutdown()
+    logger.info("Clients and scheduler shut down gracefully.")
 
 app = FastAPI(
     title="Task Manager",

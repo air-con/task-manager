@@ -27,9 +27,7 @@ async def check_and_replenish_tasks():
             # Fetch in batches of 500 as per requirement
             tasks_to_fetch = min(tasks_to_fetch, 500)
             
-            await services.send_feishu_notification(
-                f"Task pool is low ({current_task_count}). Replenishing {tasks_to_fetch} tasks."
-            )
+            logger.info(f"Task pool is low ({current_task_count}). Replenishing {tasks_to_fetch} tasks.")
             
             # Get tasks from Supabase that are in PENDING state
             new_tasks = await services.get_pending_tasks(tasks_to_fetch)

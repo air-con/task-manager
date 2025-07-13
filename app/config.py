@@ -22,7 +22,5 @@ class Settings:
     SCHEDULER_TASK_REPLENISH_COUNT: int = int(os.getenv("SCHEDULER_TASK_REPLENISH_COUNT", 5000))
     SCHEDULER_BATCH_SIZE: int = int(os.getenv("SCHEDULER_BATCH_SIZE", 10))
 
-    
-    
 
 settings = Settings()
