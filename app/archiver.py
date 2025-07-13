@@ -68,3 +68,6 @@ async def check_if_ids_exist(ids: List[str]) -> List[bool]:
             logger.error(f"Failed to check IDs in Momento: {response}")
             # In case of failure, assume all might be duplicates to be safe.
             return [True] * len(ids)
+    except Exception as e:
+        logger.error(f"An error occurred while checking IDs in Momento: {e}")
+        return [True] * len(ids)
