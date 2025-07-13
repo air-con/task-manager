@@ -7,7 +7,8 @@ import hashlib
 import json
 from celery import Celery
 
-from . import clients, config, state
+from .config import settings
+from . import clients, state
 
 # --- Type Definitions ---
 
