@@ -1,7 +1,7 @@
 from loguru import logger
 from datetime import datetime, timedelta
 from momento import CacheClient, Configurations, CredentialProvider
-from momento.responses import CacheSetAddElements, CacheSetContainsElements
+from momento import responses
 
 from . import services, clients
 
@@ -36,7 +36,7 @@ async def archive_completed_tasks():
 
         # 2. Archive IDs to Momento
         add_response = await clients.momento_client.set_add_elements(CACHE_NAME, SET_NAME, task_ids)
-        if isinstance(add_response, CacheSetAddElements.Success):
+        if isinstance(add_response, responses.CacheSetAddElements.Success):
             logger.info(f"Successfully archived {len(task_ids)} IDs to Momento.")
         else:
             logger.error(f"Failed to archive IDs to Momento: {add_response}")
@@ -62,7 +62,7 @@ async def check_if_ids_exist(ids: List[str]) -> List[bool]:
     
     try:
         response = await clients.momento_client.set_contains_elements(CACHE_NAME, SET_NAME, ids)
-        if isinstance(response, CacheSetContainsElements.Success):
+        if isinstance(response, responses.CacheSetContainsElements.Success):
             return response.contains_elements
         else:
             logger.error(f"Failed to check IDs in Momento: {response}")
