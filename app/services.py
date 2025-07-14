@@ -7,7 +7,7 @@ import hashlib
 import json
 from celery import Celery
 
-from .config import settings
+from .config import get_settings
 from . import clients, state
 from .schemas import StatusEnum, TaskRecord, TaskUpdate
 
@@ -30,16 +30,13 @@ class TaskUpdate(TypedDict):
 
 # --- Client Initializations ---
 
-celery_app = Celery(settings.CELERY_APP_NAME, broker=settings.CELERY_BROKER_URL)
+celery_app = Celery(get_settings().CELERY_APP_NAME, broker=get_settings().CELERY_BROKER_URL)
 
 # --- Database Operations (Async Supabase) ---
 
 async def _get_supabase_headers(prefer_return: bool = True) -> Dict[str, str]:
-    headers = {
-        "apikey": settings.SUPABASE_KEY,
-        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
+    """Constructs headers for a Supabase request, with optional 'Prefer' header."""
+    headers = clients.supabase_headers.copy()
     if prefer_return:
         headers["Prefer"] = "return=representation"
     return headers
@@ -49,7 +46,7 @@ async def add_tasks(records: List[TaskRecord]) -> List[Dict[str, Any]]:
     Adds or updates a list of records in the Supabase 'tasks' table using a shared httpx client.
     """
     headers = await _get_supabase_headers()
-    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
+    url = f"{get_settings().SUPABASE_URL}/rest/v1/tasks"
     
     try:
         response = await clients.httpx_client.post(url, headers=headers, json=records, params={"on_conflict": "id"})
@@ -66,7 +63,7 @@ async def update_tasks(updates: List[TaskUpdate]):
     """
     headers = await _get_supabase_headers()
     for update in updates:
-        url = f"{settings.SUPABASE_URL}/rest/v1/tasks?id=eq.{update['record_id']}"
+        url = f"{get_settings().SUPABASE_URL}/rest/v1/tasks?id=eq.{update['record_id']}"
         try:
             await clients.httpx_client.patch(url, headers=headers, json=update['fields'])
         except httpx.HTTPStatusError as e:
@@ -77,7 +74,7 @@ async def get_pending_tasks(count: int) -> List[Dict[str, Any]]:
     Gets a specified number of tasks with 'PENDING' status from Supabase using a shared httpx client.
     """
     headers = await _get_supabase_headers()
-    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
+    url = f"{get_settings().SUPABASE_URL}/rest/v1/tasks"
     params = {"status": "eq.PENDING", "limit": str(count), "select": "*"}
     
     try:
@@ -94,21 +91,56 @@ async def get_completed_tasks_before(timestamp: datetime) -> List[Dict[str, Any]
     """
     Gets tasks that were completed (SUCCESS or FAILED) before a given timestamp.
     """
+    settings = get_settings()
+    headers = await _get_supabase_headers()
+    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
+    params = {
+        "select": "id",
+        "status": "in.(SUCCESS,FAILED)",
+        "updated_at": f"lte.{timestamp.isoformat()}"
+    }
     try:
-        response = await supabase.table('tasks').select("id").in_('status', ['SUCCESS', 'FAILED']).lte('updated_at', timestamp.isoformat()).execute()
-        return response.data
+        response = await clients.httpx_client.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error getting completed tasks: {e.response.text}")
     except Exception as e:
         logger.error(f"Failed to get completed tasks from Supabase: {e}")
-        return []
+    return []
+
+async def get_pending_tasks_count() -> int:
+    """
+    Gets the count of tasks with 'PENDING' status from Supabase efficiently.
+    """
+    settings = get_settings()
+    headers = await _get_supabase_headers(prefer_return=False)
+    headers["Prefer"] = "count=exact"
+    url = f"{get_settings().SUPABASE_URL}/rest/v1/tasks"
+    params = {"status": "eq.PENDING", "limit": "1"} # Limit 1 is needed for count
+    
+    try:
+        response = await clients.httpx_client.head(url, headers=headers, params=params)
+        response.raise_for_status()
+        content_range = response.headers.get("content-range")
+        if content_range:
+            return int(content_range.split('/')[1])
+        return 0
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error getting pending task count: {e.response.text}")
+    except Exception as e:
+        logger.error(f"Failed to get pending task count from Supabase: {e}")
+    return -1 # Return -1 to indicate an error
 
 async def delete_tasks(ids: List[str]):
     """
     Deletes tasks from Supabase by their IDs without returning the data.
     """
     headers = await _get_supabase_headers(prefer_return=False)
-    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
+    url = f"{get_settings().SUPABASE_URL}/rest/v1/tasks"
+    params = {"id": f"in.({','.join(ids)})"}
     try:
-        response = await clients.httpx_client.delete(url, headers=headers, params={"id": f"in.({', '.join(ids)})"})
+        response = await clients.httpx_client.delete(url, headers=headers, params=params)
         response.raise_for_status()
     except httpx.HTTPStatusError as e:
         logger.error(f"HTTP error while deleting tasks: {e.response.text}")

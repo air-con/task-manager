@@ -85,7 +85,7 @@ Now, edit the `.env` file and fill in the following values:
 - `MOMENTO_API_KEY`: Your Momento API key for ID archiving.
 - `API_KEY_HASH`: The SHA-256 hash of your secret API key for client authentication.
 - `CELERY_BROKER_URL`: The URL for your Celery message broker.
-- ... (and other Celery/Scheduler settings)
+- `CELERY_QUEUE`: The target Celery queue.
 
 
 ## How to Run

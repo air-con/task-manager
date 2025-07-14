@@ -11,7 +11,7 @@ from .api import router as api_router, api_key_auth
 from .scheduler import check_and_replenish_tasks
 from .archiver import archive_completed_tasks
 from .logging_config import setup_logging
-from .config import settings
+from .config import get_settings
 
 from momento import CacheClient, Configurations, CredentialProvider
 from datetime import timedelta
@@ -26,13 +26,19 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up the application...")
     
     # Initialize and store shared clients
+    settings = get_settings()
     clients.httpx_client = httpx.AsyncClient()
     clients.momento_client = CacheClient(
         Configurations.Laptop.v1(), 
         CredentialProvider.from_string(settings.MOMENTO_API_KEY), 
         default_ttl=timedelta(days=365*10)
     )
-    logger.info("HTTPX and Momento clients initialized.")
+    clients.supabase_headers = {
+        "apikey": settings.SUPABASE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    logger.info("HTTPX, Momento, and Supabase clients initialized.")
 
     # Initialize and start the scheduler
     scheduler = AsyncIOScheduler()
@@ -68,13 +74,13 @@ async def get_status_page(request: Request):
     """
     Serves the status dashboard page.
     """
-    mq_task_count = services.get_mq_queue_size(settings.CELERY_QUEUE)
-    pending_tasks = await services.get_pending_tasks(count=100000) # Get a high number for an accurate count
+    mq_task_count = services.get_mq_queue_size(get_settings().CELERY_QUEUE)
+    pending_tasks_db_count = await services.get_pending_tasks_count()
     
     return templates.TemplateResponse("status.html", {
         "request": request,
         "mq_task_count": mq_task_count,
-        "pending_tasks_db": len(pending_tasks),
+        "pending_tasks_db": pending_tasks_db_count,
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
 

@@ -1,32 +1,11 @@
 from typing import List, Dict, Any, Union
-import hashlib
 import json
 from loguru import logger
-from fastapi import APIRouter, HTTPException, Body, Depends, Header
+from fastapi import APIRouter, HTTPException, Body, Depends
 
 from . import services, state, archiver
 from .schemas import StatusEnum, StatusUpdate
-from .config import settings
-
-router = APIRouter()
-
-# --- Security --- 
-
-import secrets
-
-async def api_key_auth(x_api_key: str = Header(None)):
-    if not settings.API_KEY_HASH:
-        # If no key is set in the backend, disable auth.
-        return
-
-    if not x_api_key:
-        raise HTTPException(status_code=401, detail="Missing API Key")
-
-    # Hash the provided key and compare with the stored hash in a secure way.
-    provided_key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
-    
-    if not secrets.compare_digest(provided_key_hash, settings.API_KEY_HASH):
-        raise HTTPException(status_code=401, detail="Invalid API Key")
+from .security import api_key_auth
 
 # --- API Endpoints ---
 
