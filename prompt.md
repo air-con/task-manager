@@ -11,3 +11,30 @@
 7. 所有接口，因为请求体会比较大，使用POST
 8. 这个应用不负责celery的任何逻辑，我会提供一个celery的项目，这个应用只负责管理任务，不负责任务的执行
 9. 这个应用不负责MQ的任何逻辑，我会提供一个MQ的项目，这个应用只负责管理任务，不负责任务的执行
+
+### 飞书任务
+
+添加一个定时任务，每小时从飞书多维表格中获取任务的结构，并更新任务状态
+飞书多维表格格式如下：
+{
+    "task_id": task_id,
+    "state": state,
+    "traceback": str(traceback) if traceback else "",
+    # Safely get values from the result dictionary
+    "success": str(result.get('success', False)),
+    "error": str(result.get('error', '')),
+    "input": str(result.get('input', '')),
+    "response_json": str(result.get('response_json', '')),
+    "exception": str(result.get('exception', '')),
+}
+
+通过input行JSON处理，获取原始参数
+
+你需要根据state和success字段来判断任务是否成功，并更新任务状态。
+当state为SUCCESS，且success为True时，任务状态更新为SUCCESS
+当state为SUCCESS，且success不为True，更新任务为FAILED
+当state不为SUCCESS，认为是其他原因造成的任务失败，更新任务状态为PENDING，后续重试
+
+更新后，删除飞书表格中的对应行
+
+如果supabase中找不到对应的行，也删除飞书中的行

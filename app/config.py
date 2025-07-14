@@ -12,6 +12,12 @@ class Settings:
     # Momento Cache
     MOMENTO_API_KEY: str = os.getenv("MOMENTO_API_KEY")
 
+    # Feishu Bitable for Task Result Sync
+    FEISHU_APP_ID: str = os.getenv("FEISHU_APP_ID")
+    FEISHU_APP_SECRET: str = os.getenv("FEISHU_APP_SECRET")
+    FEISHU_BITABLE_APP_TOKEN: str = os.getenv("FEISHU_BITABLE_APP_TOKEN")
+    FEISHU_BITABLE_TABLE_ID: str = os.getenv("FEISHU_BITABLE_TABLE_ID")
+
     # Celery Configuration
     CELERY_APP_NAME: str = os.getenv("CELERY_APP_NAME", "task_manager")
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL")

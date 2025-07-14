@@ -10,6 +10,7 @@ from . import services, clients, state
 from .api import router as api_router, api_key_auth
 from .scheduler import check_and_replenish_tasks
 from .archiver import archive_completed_tasks
+from .feishu_sync import sync_feishu_task_results
 from .logging_config import setup_logging
 from .config import get_settings
 
@@ -43,7 +44,11 @@ async def lifespan(app: FastAPI):
     # Initialize and start the scheduler
     scheduler = AsyncIOScheduler()
     scheduler.add_job(check_and_replenish_tasks, 'interval', hours=4)
+    # Schedule the daily archival job to run at a low-traffic time, e.g., 3 AM UTC
     scheduler.add_job(archive_completed_tasks, 'cron', hour=3, minute=0)
+    # Schedule the Feishu sync job to run every hour
+    scheduler.add_job(sync_feishu_task_results, 'interval', hours=1)
+    
     scheduler.start()
     logger.info("Scheduler started.")
     

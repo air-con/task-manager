@@ -8,5 +8,4 @@ loguru
 Jinja2
 supabase
 momento
-
-supabase
+lark-oapi
