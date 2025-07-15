@@ -7,6 +7,8 @@ from . import services, state, archiver
 from .schemas import StatusEnum, StatusUpdate
 from .security import api_key_auth
 
+router = APIRouter()
+
 # --- API Endpoints ---
 
 @router.post("/tasks/ingest")
