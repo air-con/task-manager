@@ -71,6 +71,17 @@ async def priority_queue_task(tasks: Union[Dict[str, Any], List[Dict[str, Any]]]
         logger.error(f"Error in priority queue task: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while processing the priority task.")
 
+@router.get("/tasks/mq/peek")
+def peek_mq():
+    """
+    Peeks at the first message in the configured Celery queue without consuming it.
+    """
+    settings = get_settings()
+    message_body = services.peek_mq_message(settings.CELERY_QUEUE)
+    if message_body is None:
+        return {"message": "The queue is currently empty."}
+    return {"message_peek": message_body}
+
 @router.post("/tasks/update-status")
 async def update_task_status(updates: List[StatusUpdate] = Body(...)):
     """

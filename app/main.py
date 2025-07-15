@@ -75,17 +75,23 @@ app.include_router(api_router, prefix="/api", tags=["Tasks"], dependencies=[Depe
 templates = Jinja2Templates(directory="templates")
 
 @app.get("/status", response_class=HTMLResponse)
-async def get_status_page(request: Request):
+async def get_status_page(request: Request, peek: bool = False):
     """
-    Serves the status dashboard page.
+    Serves the status dashboard page. Can optionally peek at a message from the MQ.
     """
-    mq_task_count = services.get_mq_queue_size(get_settings().CELERY_QUEUE)
+    settings = get_settings()
+    mq_task_count = services.get_mq_queue_size(settings.CELERY_QUEUE)
     pending_tasks_db_count = await services.get_pending_tasks_count()
     
+    peeked_message = None
+    if peek:
+        peeked_message = services.peek_mq_message(settings.CELERY_QUEUE)
+
     return templates.TemplateResponse("status.html", {
         "request": request,
         "mq_task_count": mq_task_count,
         "pending_tasks_db": pending_tasks_db_count,
+        "peeked_message": peeked_message,
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
 

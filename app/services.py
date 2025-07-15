@@ -161,6 +161,33 @@ def create_task_records(data: List[Dict[str, Any]], status: StatusEnum) -> List[
         })
     return records_to_add
 
+def peek_mq_message(queue_name: str) -> Any:
+    """
+    Non-destructively peeks at the first message in the queue.
+    It gets a message, decodes it, and then rejects it to re-queue it.
+    Returns the message body or None if the queue is empty.
+    """
+    try:
+        with celery_app.connection_for_read() as conn:
+            with conn.channel() as channel:
+                message = channel.basic_get(queue=queue_name, no_ack=False)
+                if message is None:
+                    logger.info(f"Queue '{queue_name}' is empty. Nothing to peek.")
+                    return None
+
+                # Decode the message body
+                decoded_body = json.loads(message.body.decode())
+                logger.info(f"Peeked at message in queue '{queue_name}'. Re-queueing.")
+
+                # Re-queue the message by rejecting it
+                channel.basic_reject(delivery_tag=message.delivery_tag, requeue=True)
+                
+                return decoded_body
+
+    except Exception as e:
+        logger.error(f"Could not peek at MQ queue '{queue_name}'. Error: {e}")
+        return None
+
 # --- MQ & Notification Operations ---
 
 def get_mq_queue_size(queue_name: str) -> int:
