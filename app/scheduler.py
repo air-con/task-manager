@@ -11,10 +11,10 @@ async def check_and_replenish_tasks():
     Checks the number of tasks in the MQ and replenishes them from the database if below a threshold.
     """
     try:
-        task_pool_threshold = int(settings.SCHEDULER_TASK_REPLENISH_COUNT * TASK_POOL_THRESHOLD_RATIO)
+        task_pool_threshold = int(get_settings().SCHEDULER_TASK_REPLENISH_COUNT * TASK_POOL_THRESHOLD_RATIO)
         
         # Get the current queue size directly from RabbitMQ
-        current_task_count = services.get_mq_queue_size(settings.CELERY_QUEUE)
+        current_task_count = services.get_mq_queue_size(get_settings().CELERY_QUEUE)
 
         if current_task_count == -1:
             logger.error("Could not get task count from MQ. Skipping replenishment cycle.")
@@ -23,7 +23,7 @@ async def check_and_replenish_tasks():
         logger.info(f"Current tasks in MQ: {current_task_count}. Threshold: {task_pool_threshold}")
 
         if current_task_count < task_pool_threshold:
-            tasks_to_fetch = settings.SCHEDULER_TASK_REPLENISH_COUNT - current_task_count
+            tasks_to_fetch = get_settings().SCHEDULER_TASK_REPLENISH_COUNT - current_task_count
             # Fetch in batches of 500 as per requirement
             tasks_to_fetch = min(tasks_to_fetch, 500)
             
@@ -37,7 +37,7 @@ async def check_and_replenish_tasks():
                 return
 
             # Publish tasks based on the configured batch size
-            batch_size = settings.SCHEDULER_BATCH_SIZE
+            batch_size = get_settings().SCHEDULER_BATCH_SIZE
             if batch_size > 1:
                 logger.info(f"Publishing tasks in multi-mode with batch size {batch_size}.")
                 chunked_tasks = [new_tasks[i:i + batch_size] for i in range(0, len(new_tasks), batch_size)]
