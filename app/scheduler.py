@@ -1,7 +1,7 @@
 from loguru import logger
 
 from . import services
-from config import get_settings
+from .config import get_settings
 
 # If the number of pending tasks drops below 60% of the replenish count, trigger replenishment.
 TASK_POOL_THRESHOLD_RATIO = 0.6
