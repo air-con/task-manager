@@ -1,21 +1,32 @@
-name: Publish Docker Image to Docker Hub
+name: Increment, Tag, and Publish Docker Image
 
 on:
   push:
     branches: ['main']
-  release:
-    types: [published]
 
 jobs:
   build_and_publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      packages: write
+      contents: write # Needed to push new tags
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all history for git tags
+
+      - name: Get next version
+        id: version
+        run: |
+          git fetch --tags
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          major=$(echo $latest_tag | cut -d. -f1 | sed 's/v//')
+          minor=$(echo $latest_tag | cut -d. -f2)
+          patch=$(echo $latest_tag | cut -d. -f3)
+          next_patch=$((patch + 1))
+          new_tag="v${major}.${minor}.${next_patch}"
+          echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -26,26 +37,21 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}
-          tags: |
-            # on push to main, generate latest and date-based tags
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=schedule,pattern={{date 'YYYYMMDD'}}-{{sha-short}},enable=${{ github.ref == 'refs/heads/main' }}
-            # on release, generate tag from git tag
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}:buildcache,mode=max
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}:${{ steps.version.outputs.new_tag }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}:latest
+          labels: |-
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.version=${{ steps.version.outputs.new_tag }}
+
+      - name: Create and push new Git tag
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag ${{ steps.version.outputs.new_tag }}
+          git push origin ${{ steps.version.outputs.new_tag }}
