@@ -32,11 +32,13 @@ jobs:
         with:
           images: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}
           tags: |
-            # For releases, use the git tag (e.g., v1.0.0)
-            type=ref,event=release
-            # For pushes to main, use 'latest' and a unique date-based tag
-            type=schedule,pattern={{date 'YYYYMMDD'}}-{{sha-short}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            # on push to main, generate latest and date-based tags
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=schedule,pattern={{date 'YYYYMMDD'}}-{{sha-short}},enable=${{ github.ref == 'refs/heads/main' }}
+            # on release, generate tag from git tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
