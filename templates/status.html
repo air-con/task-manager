@@ -45,25 +45,27 @@
             <a href="?peek=true" class="btn btn-primary">Peek Task from MQ</a>
         </div>
 
-        {% if peeked_message %}
-        <div class="row justify-content-center mt-4">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header fs-5">Peeked Task Content</div>
-                    <div class="card-body bg-light">
-                        <pre class="mb-0"><code>{{ peeked_message | tojson(indent=4) }}</code></pre>
+        {% if peek_attempted %}
+            {% if peeked_message %}
+            <div class="row justify-content-center mt-4">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header fs-5">Peeked Task Content</div>
+                        <div class="card-body bg-light">
+                            <pre class="mb-0"><code>{{ peeked_message | tojson(indent=4) }}</code></pre>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        {% elif peek and peeked_message is none %}
-        <div class="row justify-content-center mt-4">
-            <div class="col-md-8">
-                <div class="alert alert-info" role="alert">
-                    The message queue is currently empty. Nothing to peek.
+            {% else %}
+            <div class="row justify-content-center mt-4">
+                <div class="col-md-8">
+                    <div class="alert alert-info" role="alert">
+                        The message queue is currently empty. Nothing to peek.
+                    </div>
                 </div>
             </div>
-        </div>
+            {% endif %}
         {% endif %}
 
         <div class="text-center text-muted mt-4">

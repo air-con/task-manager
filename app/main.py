@@ -92,6 +92,7 @@ async def get_status_page(request: Request, peek: bool = False):
         "mq_task_count": mq_task_count,
         "pending_tasks_db": pending_tasks_db_count,
         "peeked_message": peeked_message,
+        "peek_attempted": peek, # Explicitly tell the template a peek was attempted
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
 
