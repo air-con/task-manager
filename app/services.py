@@ -93,7 +93,7 @@ async def get_completed_tasks_before(timestamp: datetime) -> List[Dict[str, Any]
     """
     settings = get_settings()
     headers = await _get_supabase_headers()
-    url = f"{settings.SUPABASE_URL}/rest/v1/tasks"
+    url = f"{get_settings().SUPABASE_URL}/rest/v1/tasks"
     params = {
         "select": "id",
         "status": "in.(SUCCESS,FAILED)",
@@ -167,26 +167,35 @@ def peek_mq_message(queue_name: str) -> Any:
     It gets a message, decodes it, and then rejects it to re-queue it.
     Returns the message body or None if the queue is empty.
     """
+    conn = None
+    channel = None
+    message = None
     try:
-        with celery_app.connection_for_read() as conn:
-            with conn.channel() as channel:
-                message = channel.basic_get(queue=queue_name, no_ack=False)
-                if message is None:
-                    logger.info(f"Queue '{queue_name}' is empty. Nothing to peek.")
-                    return None
+        conn = celery_app.connection_for_read()
+        channel = conn.channel()
+        message = channel.basic_get(queue=queue_name, no_ack=False)
+        
+        if message is None:
+            logger.info(f"Queue '{queue_name}' is empty. Nothing to peek.")
+            return None
 
-                # Decode the message body
-                decoded_body = json.loads(message.body.decode())
-                logger.info(f"Peeked at message in queue '{queue_name}'. Re-queueing.")
+        # Use Celery's consumer to properly decode the message
+        from celery.app.amqp import AmqpConsumer
+        consumer = AmqpConsumer(channel)
+        decoded_message = consumer.decode_message(message.body, message.content_type, message.content_encoding)
 
-                # Re-queue the message by rejecting it
-                channel.basic_reject(delivery_tag=message.delivery_tag, requeue=True)
-                
-                return decoded_body
+        logger.info(f"Peeked at message in queue '{queue_name}'. Re-queueing.")
+        return decoded_message['body']
 
     except Exception as e:
         logger.error(f"Could not peek at MQ queue '{queue_name}'. Error: {e}")
         return None
+    finally:
+        # Ensure message is always re-queued and connection is closed
+        if conn and channel and message:
+            channel.basic_reject(delivery_tag=message.delivery_tag, requeue=True)
+        if conn:
+            conn.close()
 
 # --- MQ & Notification Operations ---
 
