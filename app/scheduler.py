@@ -42,11 +42,13 @@ async def check_and_replenish_tasks():
                 logger.info(f"Publishing tasks in multi-mode with batch size {batch_size}.")
                 chunked_tasks = [new_tasks[i:i + batch_size] for i in range(0, len(new_tasks), batch_size)]
                 for chunk in chunked_tasks:
-                    services.publish_to_celery([task['payload'] for task in chunk])
+                    # Deserialize payload before sending to Celery
+                    tasks_to_publish = [json.loads(task['payload'] for task in chunk)]
+                    services.publish_to_celery(tasks_to_publish)
             else: # single mode
                 logger.info("Publishing tasks in single-mode.")
                 for task in new_tasks:
-                    services.publish_to_celery(task['payload'])
+                    services.publish_to_celery(json.loads(task['payload']))
             
             # Update their status to PROCESSING
             updates = [

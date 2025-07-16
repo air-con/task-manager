@@ -21,22 +21,24 @@
         <div class="row justify-content-center">
             <div class="col-md-4">
                 <div class="card status-card text-center mb-4">
-                    <div class="card-header fs-5">Tasks in Message Queue</div>
+                    <div class="card-header fs-5">DB Pending Tasks</div>
                     <div class="card-body">
-                        {% if mq_task_count == -1 %}
-                            <h2 class="display-1 fw-bold text-danger">ERROR</h2>
-                            <p class="card-text text-muted">Could not connect to the message queue.</p>
-                        {% else %}
-                            <h2 class="display-1 fw-bold">{{ mq_task_count }}</h2>
-                        {% endif %}
+                        <h2 class="display-1 fw-bold">{{ pending_tasks_db }}</h2>
+                        <p class="card-text text-muted small">Tasks in the database waiting to be sent to the message queue by the scheduler.</p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="card status-card text-center mb-4">
-                    <div class="card-header fs-5">Pending Tasks in Database</div>
+                    <div class="card-header fs-5">Live MQ Depth</div>
                     <div class="card-body">
-                        <h2 class="display-1 fw-bold">{{ pending_tasks_db }}</h2>
+                        {% if mq_task_count == -1 %}
+                            <h2 class="display-1 fw-bold text-danger">ERROR</h2>
+                            <p class="card-text text-muted small">Could not connect to the message queue.</p>
+                        {% else %}
+                            <h2 class="display-1 fw-bold">{{ mq_task_count }}</h2>
+                            <p class="card-text text-muted small">Live count of tasks currently waiting in the message queue to be processed.</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
